@@ -8,6 +8,7 @@ import { text, boolean, color, withKnobs } from "@storybook/addon-knobs";
 
 import "../__mocks__/map.css";
 import BaseMap from "@opentripplanner/base-map";
+import VehicleRentalOverlay from "@opentripplanner/vehicle-rental-overlay";
 import { formatDurationWithSeconds } from "@opentripplanner/core-utils/src/time";
 import TransitVehicleOverlay from "./index";
 
@@ -30,6 +31,7 @@ const line = require("../__mocks__/line100.json");
 const all = require("../__mocks__/all.json");
 const altLine = require("../__mocks__/tm_all.json");
 const altGeom = require("../__mocks__/tm_geojson.json");
+const scooters = require("../__mocks__/scooters.json");
 
 const PORTLAND = [45.523, -122.671];
 const INITIAL_ZOOM_LEVEL = 14;
@@ -58,6 +60,28 @@ const rectangleSymbols = [
   {
     minZoom: 14,
     symbol: DetailedRectangle
+  }
+];
+
+// scooter symbols
+const EScooterMapSymbols = [
+  {
+    fillColor: "#F80600",
+    minZoom: 0,
+    pixels: 4,
+    type: "circle"
+  },
+  {
+    fillColor: "#880600",
+    minZoom: 14,
+    pixels: 6,
+    type: "circle"
+  },
+  {
+    fillColor: "#480600",
+    minZoom: 18,
+    pixels: 20,
+    type: "circle"
   }
 ];
 
@@ -206,9 +230,16 @@ function rectangles(popup = true) {
  * continuing on from the 'rectangles' demo above, add live data, callbacks, etc...
  * also provide knobs to control which routes to display and programmatically select vehicles
  */
-function realtimeExample(fetchVehicles, fetchPattern, markers) {
+function realtimeExample(
+  fetchVehicles,
+  fetchPattern,
+  markers,
+  rteKnob = "",
+  renderScooters = false,
+  tracking = true
+) {
   // knobs setup
-  const routes = text("list of routes to query vehicles", "");
+  const routes = text("list of routes to query vehicles", rteKnob);
   const trackedId = text("tripId or blockId of tracked vehicle", "");
   const isFlyTo = boolean("FlyTo Recenter (PanTo default)", false);
   const showOnlyTracked = boolean("hide other vehicles when tracking", false);
@@ -216,7 +247,9 @@ function realtimeExample(fetchVehicles, fetchPattern, markers) {
   const highlightColor = color("isTracked color:", "#D1472D");
 
   // recenter the map via either FlyTo or PanTo
-  const recenter = isFlyTo ? utils.recenterFlyTo() : utils.recenterPanTo();
+  let recenter = isFlyTo ? utils.recenterFlyTo() : utils.recenterPanTo();
+  if (!tracking) recenter = null;
+
   const clickVehicle = vehicle => {
     setClicked(vehicle);
   };
@@ -275,6 +308,16 @@ function realtimeExample(fetchVehicles, fetchPattern, markers) {
         TooltipSlot={VehicleTooltip}
         PopupSlot={VehiclePopup}
       />
+
+      {renderScooters && (
+        <VehicleRentalOverlay
+          stations={scooters}
+          mapSymbols={EScooterMapSymbols}
+          refreshVehicles={action("refresh scooters")}
+          visible
+          zoom={zoom}
+        />
+      )}
     </BaseMap>
   );
 }
@@ -301,17 +344,31 @@ function rtCircles() {
   return realtimeExample(
     proprietary.fetchVehicles,
     proprietary.fetchPatternThrottled,
-    circleSymbols
+    circleSymbols,
+    "2, 20, 100, 200, 190"
   );
 }
 
-function rtRectangles() {
+function realtimeRectangles(doScooters = false, doTracking = true) {
   // use the live alternate vehicle ws format for the component
   return realtimeExample(
     proprietary.fetchAltVehicles,
     proprietary.fetchPatternThrottled,
-    rectangleSymbols
+    rectangleSymbols,
+    "",
+    doScooters,
+    doTracking
   );
+}
+
+function rtRectangles() {
+  return realtimeRectangles(false);
+}
+function rtRectanglesNoTracking() {
+  return realtimeRectangles(false, false);
+}
+function rtRectanglesWithScooters() {
+  return realtimeRectangles(true);
 }
 
 storiesOf("TransitVehicleOverlay", module)
@@ -323,4 +380,12 @@ storiesOf("TransitVehicleOverlay", module)
   .add("simple rectangles (click to select)", clickRectangles)
   .add("static rectangles (marker popups)", rectangles)
   .add("real-time circles", rtCircles)
-  .add("real-time rectangles", rtRectangles);
+  .add("real-time rectangles", rtRectangles)
+  .add(
+    "real-time rectangles + no tracking on selected vehicle",
+    rtRectanglesNoTracking
+  )
+  .add(
+    "real-time rectangles + scooters (stress test)",
+    rtRectanglesWithScooters
+  );
