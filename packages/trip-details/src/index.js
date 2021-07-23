@@ -4,56 +4,66 @@ import PropTypes from "prop-types";
 import React from "react";
 import { CalendarAlt, Heartbeat, MoneyBillAlt } from "styled-icons/fa-solid";
 
+import {
+  DefaultDepart,
+  DefaultTransitFare,
+  DefaultTNCFare,
+  DefaultCaloriesBurned,
+  DefaultCaloriesBurnedDescription
+} from "./defaults";
+import Message from "./message";
 import * as Styled from "./styled";
 import TripDetail from "./trip-detail";
 
 export default function TripDetails({
   className,
   itinerary,
+  localized,
   longDateFormat,
   messages,
-  routingType,
   timeOptions
 }) {
-  const date = moment(itinerary.startTime);
   messages = coreUtils.messages.mergeMessages(
     TripDetails.defaultProps.messages,
     messages
   );
 
-  // process the transit fare
-  const {
-    centsToString,
-    dollarsToString,
-    maxTNCFare,
-    minTNCFare,
-    transitFare
-  } = coreUtils.itinerary.calculateFares(itinerary);
+  // TODO: refactor
   let companies;
   itinerary.legs.forEach(leg => {
     if (leg.tncData) {
       companies = leg.tncData.company;
     }
   });
+
+  // process the transit fare
+  const fareResult = coreUtils.itinerary.calculateFares(itinerary);
+  const { maxTNCFare, minTNCFare, transitFare } = fareResult;
   let fare;
   if (transitFare || minTNCFare) {
     fare = (
       <Styled.Fare>
         {transitFare && (
           <Styled.TransitFare>
-            {messages.transitFare}: <b>{centsToString(transitFare)}</b>
+            <Message
+              defaultContent={<DefaultTransitFare fareResult={fareResult} />}
+              localized={localized}
+              messageId={messages.transitFare}
+              values={{ transitFare }}
+            />
           </Styled.TransitFare>
         )}
         {minTNCFare !== 0 && (
           <Styled.TNCFare>
             <br />
-            <Styled.TNCFareCompanies>
-              {companies.toLowerCase()}
-            </Styled.TNCFareCompanies>{" "}
-            {messages.fare}:{" "}
-            <b>
-              {dollarsToString(minTNCFare)} - {dollarsToString(maxTNCFare)}
-            </b>
+            <Message
+              defaultContent={
+                <DefaultTNCFare fareResult={fareResult} itinerary={itinerary} />
+              }
+              localized={localized}
+              messageId={messages.tncFare}
+              values={{ companies, maxTNCFare, minTNCFare }}
+            />
           </Styled.TNCFare>
         )}
       </Styled.Fare>
@@ -69,34 +79,47 @@ export default function TripDetails({
 
   return (
     <Styled.TripDetails className={className}>
-      <Styled.TripDetailsHeader>{messages.title}</Styled.TripDetailsHeader>
+      <Styled.TripDetailsHeader>
+        <Message localized={localized} messageId={messages.title} />
+      </Styled.TripDetailsHeader>
       <Styled.TripDetailsBody>
         <TripDetail
-          description={messages.departDescription}
+          description={
+            messages.departDescription && (
+              <Message
+                localized={localized}
+                messageId={messages.departDescription}
+              />
+            )
+          }
           icon={<CalendarAlt size={17} />}
           summary={
             <Styled.Timing>
-              <span>
-                {messages.depart} <b>{date.format(longDateFormat)}</b>
-              </span>
-              {routingType === "ITINERARY" && (
-                <span>
-                  {" "}
-                  {messages.at}{" "}
-                  <b>
-                    {coreUtils.time.formatTime(
-                      itinerary.startTime,
-                      timeOptions
-                    )}
-                  </b>
-                </span>
-              )}
+              <Message
+                defaultContent={
+                  <DefaultDepart
+                    itinerary={itinerary}
+                    longDateFormat={longDateFormat}
+                    timeOptions={timeOptions}
+                  />
+                }
+                localized={localized}
+                messageId={messages.depart}
+                values={{ departDate: moment(itinerary.startTime) }}
+              />
             </Styled.Timing>
           }
         />
         {fare && (
           <TripDetail
-            description={messages.transitFareDescription}
+            description={
+              messages.transitFareDescription && (
+                <Message
+                  localized={localized}
+                  messageId={messages.transitFareDescription}
+                />
+              )
+            }
             icon={<MoneyBillAlt size={17} />}
             summary={fare}
           />
@@ -106,24 +129,32 @@ export default function TripDetails({
             icon={<Heartbeat size={17} />}
             summary={
               <Styled.CaloriesSummary>
-                {messages.caloriesBurned}: <b>{Math.round(caloriesBurned)}</b>
+                <Message
+                  defaultContent={
+                    <DefaultCaloriesBurned caloriesBurned={caloriesBurned} />
+                  }
+                  localized={localized}
+                  messageId={messages.caloriesBurned}
+                  values={{ caloriesBurned }}
+                />
               </Styled.CaloriesSummary>
             }
             description={
-              <Styled.CaloriesDescription>
-                Calories burned is based on{" "}
-                <b>{Math.round(walkDuration / 60)} minute(s)</b> spent walking
-                and <b>{Math.round(bikeDuration / 60)} minute(s)</b> spent
-                biking during this trip. Adapted from{" "}
-                <a
-                  href="https://health.gov/dietaryguidelines/dga2005/document/html/chapter3.htm#table4"
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Dietary Guidelines for Americans 2005, page 16, Table 4
-                </a>
-                .
-              </Styled.CaloriesDescription>
+              messages.caloriesBurnedDescription && (
+                <Styled.CaloriesDescription>
+                  <Message
+                    defaultContent={
+                      <DefaultCaloriesBurnedDescription
+                        bikeDuration={bikeDuration}
+                        walkDuration={walkDuration}
+                      />
+                    }
+                    localized={localized}
+                    messageId={messages.caloriesBurnedDescription}
+                    values={{ bikeDuration, caloriesBurned, walkDuration }}
+                  />
+                </Styled.CaloriesDescription>
+              )
             }
           />
         )}
@@ -135,50 +166,51 @@ export default function TripDetails({
 TripDetails.propTypes = {
   /** Used for additional styling with styled components for example. */
   className: PropTypes.string,
-  /** Itinerary that the user has selected to view, contains multiple legs */
+  /** Itinerary that the user has selected to view, contains multiple legs. */
   itinerary: coreUtils.types.itineraryType.isRequired,
-  /** the desired format to use for a long date */
+  /** Determines whether messages are localized message ids or React content. */
+  localized: PropTypes.bool,
+  /** the desired format to use for a long date. */
   longDateFormat: PropTypes.string,
   /**
    * messages to use for l10n/i8n
    *
    * Note: messages with default null values included here for visibility.
-   * Overriding with a truthy string value will cause the expandable help
+   * Overriding with truthy content will cause the expandable help
    * message to appear in trip details.
    */
   messages: PropTypes.shape({
-    at: PropTypes.string,
-    caloriesBurned: PropTypes.string,
-    // FIXME: Add templated string description.
-    caloriesBurnedDescription: PropTypes.string,
-    depart: PropTypes.string,
-    departDescription: PropTypes.string,
+    caloriesBurned: PropTypes.element,
+    caloriesBurnedDescription: PropTypes.element,
+    depart: PropTypes.element,
+    departDescription: PropTypes.element,
     title: PropTypes.string,
-    fare: PropTypes.string,
-    transitFare: PropTypes.string,
-    transitFareDescription: PropTypes.string
+    tncFare: PropTypes.element,
+    transitFare: PropTypes.element,
+    transitFareDescription: PropTypes.element
   }),
-  /** whether the routing type is an itinerary or a profile result */
-  routingType: PropTypes.string,
-  /** Contains the preferred format string for time display and a timezone offset */
+  /** Contains the preferred format string for time display and a timezone offset. */
   timeOptions: coreUtils.types.timeOptionsType
 };
 
 TripDetails.defaultProps = {
   className: null,
+  localized: false,
   longDateFormat: null,
+  /**
+   * If localized is set to true, messages are message ids
+   * from an <IntlProvider> component provided by the containing application,
+   * otherwise messages are React elements.
+   */
   messages: {
-    at: "at",
-    caloriesBurned: "Calories Burned",
-    // FIXME: Add templated string description.
+    caloriesBurned: null,
     caloriesBurnedDescription: null,
-    depart: "Depart",
+    depart: null,
     departDescription: null,
     title: "Trip Details",
-    fare: "Fare",
-    transitFare: "Transit Fare",
+    tncFare: null,
+    transitFare: null,
     transitFareDescription: null
   },
-  routingType: "ITINERARY",
   timeOptions: null
 };
